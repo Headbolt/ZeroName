@@ -4,6 +4,8 @@
 #
 # ABOUT THIS PROGRAM
 #
+#   This Script is designed for use in JAMF
+#
 #   - This script will ...
 #       Grab the Machines name Locally
 #       Grab the Machines Target name from the JAMF Extension Attribute
