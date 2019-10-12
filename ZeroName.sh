@@ -43,7 +43,7 @@ apiPass=$5
 apiURL=$6
 #
 # Set the name of the script for later logging
-ScriptName="ZZ 17 - Global Settings - Check and Rename Machine Based On EA Value"
+ScriptName="append prefix here as needed - Check and Rename Machine Based On EA Value"
 #
 ###############################################################################################################################################
 # 
