@@ -21,10 +21,10 @@
 #
 #	- 13/03/2018 - V1.0 - Created by Headbolt
 #
-#   - 11/10/2019 - V1.1 - Updated by Headbolt
+#	- 11/10/2019 - V1.1 - Updated by Headbolt
 #							Support added for Preload Inventory Table
 #							More comprehensive error checking and notation
-#   - 17/10/2019 - V1.2 - Updated by Headbolt
+#	- 17/10/2019 - V1.2 - Updated by Headbolt
 #							Further Updates to allow for Building Entries
 #							Both standard and Preload Entries
 #
