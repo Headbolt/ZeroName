@@ -25,8 +25,8 @@
 #							Support added for Preload Inventory Table
 #							More comprehensive error checking and notation
 #	- 17/10/2019 - V1.2 - Updated by Headbolt
-#							Further Updates to allow for Building Entries
-#							Both standard and Preload Entries
+#							Further Updates to allow for both standard and Preload Building Entries
+#							Also a few Diagnostic Lines idded that can be uncommented for troubleshooting
 #
 ###############################################################################################################################################
 #
@@ -212,8 +212,11 @@ PreLoadWrite(){
 #
 if [ "$preloadEntryB" != "" ]
 	then
-		# Set a default flag to Upload a Preload Inventory entry 
-		PreloadDelete=NO
+		# Set a default flags to Upload a Preload Inventory entry
+		PreloadUploadName="YES"
+		PreloadUploadBuilding="YES"
+        # Set a default flag to Delete exiting Preload Inventory entry 
+		PreloadDelete="NO"
 		#
 		if [[ "$preloadEAentryTCNValue" != "$TargetComputerName" ]]
 			then
@@ -222,7 +225,7 @@ if [ "$preloadEntryB" != "" ]
 				# so we set a flag to delete the existing record before uploading an updated one
 				PreloadDelete="YES"
 			else
-				PreloadDelete=$PreloadDelete
+                PreloadUploadName="NO"
 # DIAG			/bin/echo New Machine Name and Preload Inventory EA "Target Computer Name" Entry for Serial Number $serial Match
 		fi
 		#
@@ -233,7 +236,7 @@ if [ "$preloadEntryB" != "" ]
 				# so we set a flag to delete the existing record before uploading an updated one
 				PreloadDelete="YES"
 			else
-				PreloadDelete=$PreloadDelete
+				PreloadUploadBuilding="NO"
 # DIAG			/bin/echo '"'Building'"' Entry and Preload Inventory '"'Building'"' Entry for Serial Number $serial Match
 		fi
 		#
@@ -242,23 +245,26 @@ if [ "$preloadEntryB" != "" ]
 				/bin/echo Deleting Preload Inventory Record ID $preloadEntryID
 				DeleteOutcome=$(curl -s -X DELETE -H 'Authorization: Bearer '$token'' -H "accept: application/json" -H "Content-Type: application/json" https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload/$preloadEntryID)
 				DeleteOutput=$(/bin/echo $DeleteOutcome | grep error)
-				#
 				if [ "$DeleteOutput" != "" ]
 					then
 						echo $DeleteOutput
 				fi
-				#
 		fi
 fi
 #
-/bin/echo Uploading Preload Inventory Entry
-UploadOutcome=$(curl -s -X POST "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
-UploadOutput=$(/bin/echo $UploadOutcome | grep error)
-#
-if [ "$UploadOutput" != "" ]
+if [ "$PreloadUploadName" == "YES" ]
 	then
-		echo $UploadOutput
-fi        
+		if [ "$PreloadUploadName" == "YES" ]
+			then
+				/bin/echo Uploading Preload Inventory Entry
+				UploadOutcome=$(curl -s -X POST "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
+				UploadOutput=$(/bin/echo $UploadOutcome | grep error)
+				if [ "$UploadOutput" != "" ]
+					then
+						/bin/echo $UploadOutput
+				fi  
+		fi
+fi
 #
 SectionEnd
 #
@@ -368,7 +374,7 @@ if [ ! -z "$TargetComputerName" ]
 fi
 #
 # Check Preload Inventory Building Entry
-if [ ! -z "$PreloadBuildingEntry" ]
+if [ "$PreloadBuildingEntryPresent" == "Present" ]
 	then
 		# Check if Building Entry and Preload Inventory Building Entry match
     	if [[ "$Building" != "$PreloadBuildingEntry" ]]
@@ -387,13 +393,13 @@ if [ ! -z "$PreloadBuildingEntry" ]
 		fi
 	else
 	    #
-        /bin/echo "Could not get assigned Building from computer record"
-        ScriptEnd
-        exit 1
+		/bin/echo "PreloadBuildingEntry not present, triggering its creation/update"
+		PreloadUpdate=YES
 fi
 #
 if [[ "$PreloadUpdate" == "YES" ]]
 	then
+		SectionEnd
 		PreLoadWrite
 fi
 #
