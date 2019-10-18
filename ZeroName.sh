@@ -17,7 +17,7 @@
 #
 # HISTORY
 #
-#	Version: 1.2 - 17/10/2019
+#	Version: 1.3 - 18/10/2019
 #
 #	- 13/03/2018 - V1.0 - Created by Headbolt
 #
@@ -27,6 +27,8 @@
 #	- 17/10/2019 - V1.2 - Updated by Headbolt
 #							Further Updates to allow for both standard and Preload Building Entries
 #							Also a few Diagnostic Lines idded that can be uncommented for troubleshooting
+#	- 18/10/2019 - V1.3 - Updated by Headbolt
+#							Few Tweaks to Logic loops to fix a bug or 2 and also to improve a few bits
 #
 ###############################################################################################################################################
 #
@@ -250,20 +252,29 @@ if [ "$preloadEntryB" != "" ]
 						echo $DeleteOutput
 				fi
 		fi
+	else
+    	Upload="YES"
 fi
 #
 if [ "$PreloadUploadName" == "YES" ]
 	then
-		if [ "$PreloadUploadName" == "YES" ]
+		Upload="YES"
+fi
+#
+if [ "$PreloadUploadBuilding" == "YES" ]
+	then
+		Upload="YES"
+fi
+#
+if [ "$Upload" == "YES" ]
+	then
+        /bin/echo Uploading Preload Inventory Entry
+		UploadOutcome=$(curl -s -X POST "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
+		UploadOutput=$(/bin/echo $UploadOutcome | grep error)
+		if [ "$UploadOutput" != "" ]
 			then
-				/bin/echo Uploading Preload Inventory Entry
-				UploadOutcome=$(curl -s -X POST "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
-				UploadOutput=$(/bin/echo $UploadOutcome | grep error)
-				if [ "$UploadOutput" != "" ]
-					then
-						/bin/echo $UploadOutput
-				fi  
-		fi
+				/bin/echo $UploadOutput
+		fi  
 fi
 #
 SectionEnd
