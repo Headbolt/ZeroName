@@ -4,6 +4,9 @@
 #
 # ABOUT THIS PROGRAM
 #
+#	ZeroName.sh
+#	https://https://github.com/Headbolt/ZeroName
+#
 #   This Script is designed for use in JAMF
 #
 #   - This script will ...
@@ -17,7 +20,7 @@
 #
 # HISTORY
 #
-#	Version: 1.3 - 18/10/2019
+#	Version: 1.4 - 15/05/2020
 #
 #	- 13/03/2018 - V1.0 - Created by Headbolt
 #
@@ -29,6 +32,8 @@
 #							Also a few Diagnostic Lines idded that can be uncommented for troubleshooting
 #	- 18/10/2019 - V1.3 - Updated by Headbolt
 #							Few Tweaks to Logic loops to fix a bug or 2 and also to improve a few bits
+#	- 15/05/2020 - V1.4 - Updated by Headbolt
+#							Few Tweaks cope with recent Updates in JAMF that change what is Returned by the Preload Invetory Query
 #
 ###############################################################################################################################################
 #
@@ -83,13 +88,13 @@ token=$(echo $rawtoken | awk '{print$3}' | cut -d \" -f2)
 #
 ## This Searches the Preload Inventory Table looking for the Serial Number of the machine
 preloadEntryA=$(curl -s -X GET "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload?page=0&size=100&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -B 1 ${serial})
-preloadEntryB=$(curl -s -X GET "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload?page=0&size=100&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -A 4 ${serial})
+preloadEntryB=$(curl -s -X GET "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload?page=0&size=100&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -A 24 ${serial})
 #
 ## This Searches the Preload Inventory Entry for the Machines Entry ID
 preloadEntryID=$(echo $preloadEntryA | awk -F ',' '{print $1 FS ""}' | rev | cut -c 2- | rev | cut -c 8-)
 #
 ## This Searches the Preload Inventory Entry for the Building Entry
-PreloadBuildingEntry=$(echo $preloadEntryB | awk -F ',' '{print $2 FS ""}' | rev | cut -c 3- | rev | cut -c 16-)
+PreloadBuildingEntry=$(echo $preloadEntryB | awk -F ',' '{print $8 FS ""}' | rev | cut -c 3- | rev | cut -c 16-)
 #
 # This Searches the Preload Inventory Entry for the Machines Serial Number looking for the presence of any Extension Attributes
 preloadEAentry=$(echo $preloadEntryB | grep "extensionAttributes")
@@ -416,3 +421,4 @@ fi
 #
 SectionEnd
 ScriptEnd
+
