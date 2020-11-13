@@ -20,7 +20,7 @@
 #
 # HISTORY
 #
-#	Version: 1.4 - 15/05/2020
+#	Version: 1.5 - 13/11/2020
 #
 #	- 13/03/2018 - V1.0 - Created by Headbolt
 #
@@ -34,6 +34,8 @@
 #							Few Tweaks to Logic loops to fix a bug or 2 and also to improve a few bits
 #	- 15/05/2020 - V1.4 - Updated by Headbolt
 #							Few Tweaks cope with recent Updates in JAMF that change what is Returned by the Preload Invetory Query
+#	- 13/11/2020 - V1.5 - Updated by Headbolt
+#							Minor Tweak to cope Big Sur and Above requiring different arguments for XPATH
 #
 ###############################################################################################################################################
 #
@@ -52,6 +54,7 @@ apiPass=$5
 # Grab the first part of the API URL from JAMF variable #6 eg. https://COMPANY-NAME.jamfcloud.com
 apiURL=$6
 #
+#
 # Set the name of the script for later logging
 ScriptName="append prefix here as needed - Check and Rename Machine Based On EA Value"
 #
@@ -69,6 +72,16 @@ ScriptName="append prefix here as needed - Check and Rename Machine Based On EA 
 #
 GatherData(){
 #
+## This gets the Mac's MAJOR OS Version
+OS=$(sw_vers | grep ProductVersion | cut -c 17- | cut -c -2)
+#
+if [ "$OS" == "10" ] # Checks OS, Big Sur and Above XPATH needs a -e, Pre Big Sur it cant have it
+	then
+		XP="/usr/bin/xpath"
+	else
+		XP="/usr/bin/xpath -e"
+fi
+#
 ## This gets the Mac's current name
 macName=$(scutil --get ComputerName)
 #
@@ -76,10 +89,10 @@ macName=$(scutil --get ComputerName)
 serial=$(system_profiler SPHardwareDataType | grep "Serial Number" | awk '{print $4}')
 #
 ## This gets the Target Computer Name (Extension Attribute) From The JAMF Object Matching the Serial Number of the Machine
-TargetComputerName=$(/usr/bin/curl -s -u ${apiUser}:${apiPass} -H "Accept: application/xml" "${apiURL}/JSSResource/computers/serialnumber/${serial}" | /usr/bin/xpath '/computer/extension_attributes/extension_attribute[name="Target Computer Name"]/value/text()' 2>/dev/null)
+TargetComputerName=$(/usr/bin/curl -s -u ${apiUser}:${apiPass} -H "Accept: application/xml" "${apiURL}/JSSResource/computers/serialnumber/${serial}" | ${XP} '/computer/extension_attributes/extension_attribute[name="Target Computer Name"]/value/text()' 2>/dev/null)
 #
 ## This gets the Building Name From The JAMF Object Matching the Serial Number of the Machine
-Building=$(/usr/bin/curl -s -u ${apiUser}:${apiPass} -H "Accept: application/xml" "${apiURL}/JSSResource/computers/serialnumber/${serial}" | /usr/bin/xpath '/computer/location/building/text()' 2>/dev/null)
+Building=$(/usr/bin/curl -s -u ${apiUser}:${apiPass} -H "Accept: application/xml" "${apiURL}/JSSResource/computers/serialnumber/${serial}" | ${XP} '/computer/location/building/text()' 2>/dev/null)
 #
 ## This Authenticates against the JAMF API with the Provided details and obtains an Authentication Token
 rawtoken=$(curl -s -u ${apiUser}:${apiPass} -X POST "${apiURL}/uapi/auth/tokens" | grep token)
@@ -236,9 +249,14 @@ if [ "$preloadEntryB" != "" ]
 # DIAG			/bin/echo New Machine Name and Preload Inventory EA "Target Computer Name" Entry for Serial Number $serial Match
 		fi
 		#
+        
+        echo Building = $Building
+		echo PreloadBuildingEntry = $PreloadBuildingEntry
+
+        
 		if [[ "$Building" != "$PreloadBuildingEntry" ]]
 			then
-# DIAG			/bin/echo '"'Building'"' Entry and Preload Inventory '"'Building'"' Entry for Serial Number $serial Do Not Match 
+# DIAG				/bin/echo '"'Building'"' Entry and Preload Inventory '"'Building'"' Entry for Serial Number $serial Do Not Match 
 				# A Preload Inventory entry clearly exists, these cannot be update
 				# so we set a flag to delete the existing record before uploading an updated one
 				PreloadDelete="YES"
@@ -421,4 +439,3 @@ fi
 #
 SectionEnd
 ScriptEnd
-
