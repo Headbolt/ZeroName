@@ -5,7 +5,7 @@
 # ABOUT THIS PROGRAM
 #
 #	ZeroName.sh
-#	https://https://github.com/Headbolt/ZeroName
+#	https://github.com/Headbolt/ZeroName
 #
 #   This Script is designed for use in JAMF
 #
