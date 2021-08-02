@@ -20,7 +20,7 @@
 #
 # HISTORY
 #
-#	Version: 1.5 - 13/11/2020
+#	Version: 1.6 - 02/08/2021
 #
 #	- 13/03/2018 - V1.0 - Created by Headbolt
 #
@@ -36,6 +36,9 @@
 #							Few Tweaks cope with recent Updates in JAMF that change what is Returned by the Preload Invetory Query
 #	- 13/11/2020 - V1.5 - Updated by Headbolt
 #							Minor Tweak to cope Big Sur and Above requiring different arguments for XPATH
+#	- 02/08/2021 - V1.6 - Updated by Headbolt
+#							Minor Tweak to cope with extended numbers of Inventory Preload records being returned
+#							Also an issue with 1 of the Variables
 #
 ###############################################################################################################################################
 #
@@ -100,8 +103,8 @@ rawtoken=${rawtoken%?};
 token=$(echo $rawtoken | awk '{print$3}' | cut -d \" -f2)
 #
 ## This Searches the Preload Inventory Table looking for the Serial Number of the machine
-preloadEntryA=$(curl -s -X GET "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload?page=0&size=100&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -B 1 ${serial})
-preloadEntryB=$(curl -s -X GET "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload?page=0&size=100&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -A 24 ${serial})
+preloadEntryA=$(curl -s -X GET "${apiURL}/uapi/v1/inventory-preload?page=0&size=10000&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -B 1 ${serial})
+preloadEntryB=$(curl -s -X GET "${apiURL}/uapi/v1/inventory-preload?page=0&size=10000&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -A 24 ${serial})
 #
 ## This Searches the Preload Inventory Entry for the Machines Entry ID
 preloadEntryID=$(echo $preloadEntryA | awk -F ',' '{print $1 FS ""}' | rev | cut -c 2- | rev | cut -c 8-)
@@ -256,7 +259,7 @@ if [ "$preloadEntryB" != "" ]
         
 		if [[ "$Building" != "$PreloadBuildingEntry" ]]
 			then
-# DIAG				/bin/echo '"'Building'"' Entry and Preload Inventory '"'Building'"' Entry for Serial Number $serial Do Not Match 
+# DIAG			/bin/echo '"'Building'"' Entry and Preload Inventory '"'Building'"' Entry for Serial Number $serial Do Not Match 
 				# A Preload Inventory entry clearly exists, these cannot be update
 				# so we set a flag to delete the existing record before uploading an updated one
 				PreloadDelete="YES"
@@ -322,14 +325,11 @@ exit 0
 #
 SectionEnd(){
 #
-# Outputting a Blank Line for Reporting Purposes
-/bin/echo
+/bin/echo # Outputting a Blank Line for Reporting Purposes
 #
-# Outputting a Dotted Line for Reporting Purposes
-/bin/echo  -----------------------------------------------
+/bin/echo  ----------------------------------------------- # Outputting a Dotted Line for Reporting Purposes
 #
-# Outputting a Blank Line for Reporting Purposes
-/bin/echo
+/bin/echo # Outputting a Blank Line for Reporting Purposes
 #
 }
 #
@@ -344,14 +344,11 @@ ScriptEnd(){
 #
 /bin/echo Ending Script '"'$ScriptName'"'
 #
-# Outputting a Blank Line for Reporting Purposes
-/bin/echo
+/bin/echo # Outputting a Blank Line for Reporting Purposes
 #
-# Outputting a Dotted Line for Reporting Purposes
-/bin/echo  -----------------------------------------------
+/bin/echo  ----------------------------------------------- # Outputting a Dotted Line for Reporting Purposes
 #
-# Outputting a Blank Line for Reporting Purposes
-/bin/echo
+/bin/echo # Outputting a Blank Line for Reporting Purposes
 #
 }
 #
@@ -365,8 +362,7 @@ ScriptEnd(){
 #
 ###############################################################################################################################################
 #
-# Outputting a Blank Line for Reporting Purposes
-/bin/echo
+/bin/echo # Outputting a Blank Line for Reporting Purposes
 SectionEnd
 #
 /bin/echo "Grabbing current Values"
