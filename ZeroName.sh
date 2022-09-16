@@ -271,7 +271,7 @@ if [ "$preloadEntryB" != "" ]
 		if [ "$PreloadDelete" == "YES" ]
 			then
 				/bin/echo Deleting Preload Inventory Record ID $preloadEntryID
-				DeleteOutcome=$(curl -s -X DELETE -H 'Authorization: Bearer '$token'' -H "accept: application/json" -H "Content-Type: application/json" https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload/$preloadEntryID)
+				DeleteOutcome=$(curl -s -X DELETE -H 'Authorization: Bearer '$token'' -H "accept: application/json" -H "Content-Type: application/json" ${apiURL}/uapi/v1/inventory-preload/$preloadEntryID)
 				DeleteOutput=$(/bin/echo $DeleteOutcome | grep error)
 				if [ "$DeleteOutput" != "" ]
 					then
@@ -295,7 +295,7 @@ fi
 if [ "$Upload" == "YES" ]
 	then
         /bin/echo Uploading Preload Inventory Entry
-		UploadOutcome=$(curl -s -X POST "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
+		UploadOutcome=$(curl -s -X POST "${apiURL}/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
 		UploadOutput=$(/bin/echo $UploadOutcome | grep error)
 		if [ "$UploadOutput" != "" ]
 			then
