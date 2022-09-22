@@ -20,7 +20,7 @@
 #
 # HISTORY
 #
-#	Version: 1.6 - 02/08/2021
+#	Version: 1.7 - 22/09/2021
 #
 #	- 13/03/2018 - V1.0 - Created by Headbolt
 #
@@ -39,6 +39,8 @@
 #	- 02/08/2021 - V1.6 - Updated by Headbolt
 #							Minor Tweak to cope with extended numbers of Inventory Preload records being returned
 #							Also an issue with 1 of the Variables
+#	- 22/09/2022 - V1.7 - Updated by Headbolt
+#							Minor Tweak and better reporting
 #
 ###############################################################################################################################################
 #
@@ -48,18 +50,11 @@
 #
 # Variables used by this script.
 #
-# Grab the username for API Login from JAMF variable #4 eg. username
-apiUser=$4
+apiUser=$4 # Grab the username for API Login from JAMF variable #4 eg. username
+apiPass=$5 # Grab the password for API Login from JAMF variable #5 eg. password
+apiURL=$6 # Grab the first part of the API URL from JAMF variable #6 eg. https://COMPANY-NAME.jamfcloud.com
 #
-# Grab the password for API Login from JAMF variable #5 eg. password
-apiPass=$5
-#
-# Grab the first part of the API URL from JAMF variable #6 eg. https://COMPANY-NAME.jamfcloud.com
-apiURL=$6
-#
-#
-# Set the name of the script for later logging
-ScriptName="append prefix here as needed - Check and Rename Machine Based On EA Value"
+ScriptName="Global | Check and Rename Machine Based On EA Value" # Set the name of the script for later logging
 #
 ###############################################################################################################################################
 # 
@@ -75,9 +70,7 @@ ScriptName="append prefix here as needed - Check and Rename Machine Based On EA 
 #
 GatherData(){
 #
-## This gets the Mac's MAJOR OS Version
-OS=$(sw_vers | grep ProductVersion | cut -c 17- | cut -c -2)
-#
+OS=$(sw_vers | grep ProductVersion | cut -c 17- | cut -c -2) ## This gets the Mac's MAJOR OS Version
 if [ "$OS" == "10" ] # Checks OS, Big Sur and Above XPATH needs a -e, Pre Big Sur it cant have it
 	then
 		XP="/usr/bin/xpath"
@@ -85,38 +78,28 @@ if [ "$OS" == "10" ] # Checks OS, Big Sur and Above XPATH needs a -e, Pre Big Su
 		XP="/usr/bin/xpath -e"
 fi
 #
-## This gets the Mac's current name
-macName=$(scutil --get ComputerName)
+macName=$(scutil --get ComputerName) # This gets the Mac's current name
+serial=$(system_profiler SPHardwareDataType | grep "Serial Number" | awk '{print $4}') # This gets the Mac's Serial Number
 #
-## This gets the Mac's Serial Number
-serial=$(system_profiler SPHardwareDataType | grep "Serial Number" | awk '{print $4}')
-#
-## This gets the Target Computer Name (Extension Attribute) From The JAMF Object Matching the Serial Number of the Machine
+# This gets the Target Computer Name (Extension Attribute) From The JAMF Object Matching the Serial Number of the Machine
 TargetComputerName=$(/usr/bin/curl -s -u ${apiUser}:${apiPass} -H "Accept: application/xml" "${apiURL}/JSSResource/computers/serialnumber/${serial}" | ${XP} '/computer/extension_attributes/extension_attribute[name="Target Computer Name"]/value/text()' 2>/dev/null)
 #
-## This gets the Building Name From The JAMF Object Matching the Serial Number of the Machine
+# This gets the Building Name From The JAMF Object Matching the Serial Number of the Machine
 Building=$(/usr/bin/curl -s -u ${apiUser}:${apiPass} -H "Accept: application/xml" "${apiURL}/JSSResource/computers/serialnumber/${serial}" | ${XP} '/computer/location/building/text()' 2>/dev/null)
 #
-## This Authenticates against the JAMF API with the Provided details and obtains an Authentication Token
-rawtoken=$(curl -s -u ${apiUser}:${apiPass} -X POST "${apiURL}/uapi/auth/tokens" | grep token)
+rawtoken=$(curl -s -u ${apiUser}:${apiPass} -X POST "${apiURL}/uapi/auth/tokens" | grep token) # This Authenticates against the JAMF API with the Provided details and obtains an Authentication Token
 rawtoken=${rawtoken%?};
 token=$(echo $rawtoken | awk '{print$3}' | cut -d \" -f2)
 #
-## This Searches the Preload Inventory Table looking for the Serial Number of the machine
+## This Searches the Preload Inventory Table looking for the Serial Number of the machine and splits in various places
 preloadEntryA=$(curl -s -X GET "${apiURL}/uapi/v1/inventory-preload?page=0&size=10000&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -B 1 ${serial})
 preloadEntryB=$(curl -s -X GET "${apiURL}/uapi/v1/inventory-preload?page=0&size=10000&sort=id%3Aasc" -H 'Authorization: Bearer '$token'' | grep -A 24 ${serial})
 #
-## This Searches the Preload Inventory Entry for the Machines Entry ID
-preloadEntryID=$(echo $preloadEntryA | awk -F ',' '{print $1 FS ""}' | rev | cut -c 2- | rev | cut -c 8-)
+preloadEntryID=$(echo $preloadEntryA | awk -F ',' '{print $1 FS ""}' | rev | cut -c 2- | rev | cut -c 8-) # This Searches the Preload Inventory Entry for the Machines Entry ID
+PreloadBuildingEntry=$(echo $preloadEntryB | awk -F ',' '{print $8 FS ""}' | rev | cut -c 3- | rev | cut -c 16-) # This Searches the Preload Inventory Entry for the Building Entry
+preloadEAentry=$(echo $preloadEntryB | grep "extensionAttributes") # This Searches the Preload Inventory Entry for the Machines Serial Number looking for the presence of any Extension Attributes
 #
-## This Searches the Preload Inventory Entry for the Building Entry
-PreloadBuildingEntry=$(echo $preloadEntryB | awk -F ',' '{print $8 FS ""}' | rev | cut -c 3- | rev | cut -c 16-)
-#
-# This Searches the Preload Inventory Entry for the Machines Serial Number looking for the presence of any Extension Attributes
-preloadEAentry=$(echo $preloadEntryB | grep "extensionAttributes")
-#
-## This Searches the Preload Inventory Entry for the Machines Serial Number looking for the presence of a "Target Computer Name" Extension Attribute
-preloadEAentryTCN=$(echo $preloadEntryB | grep "Target Computer Name")
+preloadEAentryTCN=$(echo $preloadEntryB | grep "Target Computer Name") # This Searches the Preload Inventory Entry for the Machines Serial Number looking for the presence of a "Target Computer Name" Extension Attribute
 #
 ## This Searches the Preload Inventory Entry for the Machines Serial Number looking for the Value of a "Target Computer Name" Extension Attribute
 preloadEAentryTCNValue=$(echo $preloadEAentryTCN | awk -F 'value' '{print $2 FS ""}' | cut -c 6-  | awk -F '"' '{print $1 FS ""}' | rev | cut -c 2- | rev)
@@ -172,29 +155,20 @@ fi
 #
 Check(){
 #
-# Outputting a Blank Line for Reporting Purposes
-/bin/echo
+/bin/echo # Outputting a Blank Line for Reporting Purposes
 #
-## Outputs Current Building
-/bin/echo Building this Machine is currently assigned to = $Building
+/bin/echo 'Building this Machine is currently assigned to = '$Building # Outputs Current Building
+/bin/echo 'Current Computer Name = '$macName # Outputs Current Computer Name
+/bin/echo 'Computer Serial Number = '$serial # Outputs Computers Serial Number
+/bin/echo 'Target Computer Name = '$TargetComputerName # Outputs Target Computer Name
 #
-## Outputs Current Computer Name
-/bin/echo Current Computer Name = $macName
-#
-## Outputs Computers Serial Number
-/bin/echo Computer Serial Number = $serial
-#
-## Outputs Target Computer Name
-/bin/echo Target Computer Name = $TargetComputerName
-#
-## Outputs Status of Preload Inventory Entry if present
-if [ "$preloadEntryB" != "" ]
+if [ "$preloadEntryB" != "" ] # Outputs Status of Preload Inventory Entry if present
 	then
 # DIAG	/bin/echo Preload Inventory Entry for Serial Number $serial is $preloadEntryPresent
 		#
 		if [ "$preloadEntryID" != "" ]
 			then
-				/bin/echo Preload Inventory Entry ID Serial Number $serial is $preloadEntryID
+				/bin/echo 'Preload Inventory Entry ID Serial Number '$serial' is '$preloadEntryID
 				#
 				if [ "$PreloadBuildingEntry" != "" ]
 					then
@@ -235,11 +209,9 @@ PreLoadWrite(){
 #
 if [ "$preloadEntryB" != "" ]
 	then
-		# Set a default flags to Upload a Preload Inventory entry
-		PreloadUploadName="YES"
-		PreloadUploadBuilding="YES"
-        # Set a default flag to Delete exiting Preload Inventory entry 
-		PreloadDelete="NO"
+		PreloadUploadName="YES" # Set default flags to Upload a Preload Inventory entry
+		PreloadUploadBuilding="YES" # Set default flags to Upload a Preload Inventory entry
+		PreloadDelete="NO" # Set default flag to Delete exiting Preload Inventory entry 
 		#
 		if [[ "$preloadEAentryTCNValue" != "$TargetComputerName" ]]
 			then
@@ -252,11 +224,8 @@ if [ "$preloadEntryB" != "" ]
 # DIAG			/bin/echo New Machine Name and Preload Inventory EA "Target Computer Name" Entry for Serial Number $serial Match
 		fi
 		#
-        
-        echo Building = $Building
-		echo PreloadBuildingEntry = $PreloadBuildingEntry
-
-        
+        /bin/echo 'Building = '$Building
+		/bin/echo 'PreloadBuildingEntry = '$PreloadBuildingEntry
 		if [[ "$Building" != "$PreloadBuildingEntry" ]]
 			then
 # DIAG			/bin/echo '"'Building'"' Entry and Preload Inventory '"'Building'"' Entry for Serial Number $serial Do Not Match 
@@ -271,7 +240,7 @@ if [ "$preloadEntryB" != "" ]
 		if [ "$PreloadDelete" == "YES" ]
 			then
 				/bin/echo Deleting Preload Inventory Record ID $preloadEntryID
-				DeleteOutcome=$(curl -s -X DELETE -H 'Authorization: Bearer '$token'' -H "accept: application/json" -H "Content-Type: application/json" ${apiURL}/uapi/v1/inventory-preload/$preloadEntryID)
+				DeleteOutcome=$(curl -s -X DELETE -H 'Authorization: Bearer '$token'' -H "accept: application/json" -H "Content-Type: application/json" https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload/$preloadEntryID)
 				DeleteOutput=$(/bin/echo $DeleteOutcome | grep error)
 				if [ "$DeleteOutput" != "" ]
 					then
@@ -294,8 +263,8 @@ fi
 #
 if [ "$Upload" == "YES" ]
 	then
-        /bin/echo Uploading Preload Inventory Entry
-		UploadOutcome=$(curl -s -X POST "${apiURL}/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
+        /bin/echo 'Uploading Preload Inventory Entry'
+		UploadOutcome=$(curl -s -X POST "https://huntsworth.jamfcloud.com/uapi/v1/inventory-preload" -H 'Authorization: Bearer '$token'' "accept: application/json" -H "Content-Type: application/json" -d "{ \"id\": 0, \"serialNumber\": \"$serial\", \"building\": \"$Building\", \"deviceType\": \"Computer\", \"extensionAttributes\": [ { \"name\": \"Target Computer Name\", \"value\": \"$TargetComputerName\" } ]}")
 		UploadOutput=$(/bin/echo $UploadOutcome | grep error)
 		if [ "$UploadOutput" != "" ]
 			then
@@ -314,8 +283,71 @@ SectionEnd
 Check
 SectionEnd
 #
-ScriptEnd
-exit 0
+#ExitCode=0
+#ScriptEnd
+#
+}
+#
+###############################################################################################################################################
+#
+# Check Computer Name Function
+#
+CheckComputerName(){
+#
+if [ ! -z "$TargetComputerName" ] # Check Preload Inventory Target ComputerName Entry
+	then
+		if [[ "$macName" != "$TargetComputerName" ]] # Check if Machine Name and Preload Inventory Target Computer Name Entry match
+        	then
+				/bin/echo 'Renaming Machine to '$TargetComputerName # Rename the Mac to the assigned name
+           		/usr/local/bin/jamf setComputerName -name "$TargetComputerName"
+                dscacheutil -flushcache
+                #
+				# A change has been made, or a difference between actual and Preload Inventory values is detected
+				# Setting a flag to update the Preload Inventory Entry to match
+				PreloadUpdate=YES
+			else
+				SectionEnd
+	   		    /bin/echo MATCH > /var/JAMF/Name+TargetName-Match.txt
+				/bin/echo "Mac name already matches assigned name."
+				/bin/echo "Writing Marker File"
+				/bin/echo "/var/JAMF/Name+TargetName-Match.txt"
+		fi
+	else
+		#
+		/bin/echo "Could not get assigned name from computer record"
+        ExitCode=1
+		ScriptEnd
+fi
+}
+#
+###############################################################################################################################################
+#
+# CheckPreloadBuildingEntry Function
+#
+CheckPreloadBuildingEntry(){
+#
+if [ "$PreloadBuildingEntryPresent" == "Present" ] # Check Preload Inventory Building Entry
+	then
+		# Check if Building Entry and Preload Inventory Building Entry match
+    	if [[ "$Building" != "$PreloadBuildingEntry" ]]
+        	then
+				/bin/echo "A difference between the Building value, and the Preload Inventory Building value is detected"
+				/bin/echo "Triggering an update the Preload Inventory Entry so Values match"
+				# A change has been made, or a difference between actual and Preload Inventory values is detected
+				# Setting a flag to update the Preload Inventory Entry to match
+				PreloadUpdate=YES
+			else
+				SectionEnd
+	   		    /bin/echo MATCH > /var/JAMF/buildingName+PIbuildingName-Match.txt
+				/bin/echo "Building value, and the Preload Inventory Building value already matches assigned name."
+				/bin/echo "Writing Marker File"
+				/bin/echo "/var/JAMF/buildingName+PIbuildingName-Match.txt"
+		fi
+	else
+	    #
+		/bin/echo "PreloadBuildingEntry not present, triggering its creation/update"
+		PreloadUpdate=YES
+fi
 #
 }
 #
@@ -326,9 +358,7 @@ exit 0
 SectionEnd(){
 #
 /bin/echo # Outputting a Blank Line for Reporting Purposes
-#
 /bin/echo  ----------------------------------------------- # Outputting a Dotted Line for Reporting Purposes
-#
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 #
 }
@@ -339,16 +369,12 @@ SectionEnd(){
 #
 ScriptEnd(){
 #
-# Outputting a Blank Line for Reporting Purposes
-#/bin/echo
-#
 /bin/echo Ending Script '"'$ScriptName'"'
-#
 /bin/echo # Outputting a Blank Line for Reporting Purposes
-#
 /bin/echo  ----------------------------------------------- # Outputting a Dotted Line for Reporting Purposes
-#
 /bin/echo # Outputting a Blank Line for Reporting Purposes
+#
+exit $ExitCode
 #
 }
 #
@@ -372,66 +398,27 @@ SectionEnd
 /bin/echo "Checking current Values"
 Check
 #
-# Set The Preload Update Flag to No, it will be set to yes later if required
-PreloadUpdate=NO
+PreloadUpdate=NO # Set The Preload Update Flag to No, it will be set to yes later if required
 #
-# Check Preload Inventory Target ComputerName Entry
-if [ ! -z "$TargetComputerName" ]
-	then
-		# Check if Machine Name and Preload Inventory Target Computer Name Entry match
-    	if [[ "$macName" != "$TargetComputerName" ]]
-        	then
-        		## Rename the Mac to the assigned name
-				/bin/echo Renaming Machine to $TargetComputerName
-           		/usr/local/bin/jamf setComputerName -name "$TargetComputerName"
-                dscacheutil -flushcache
-                #
-				# A change has been made, or a difference between actual and Preload Inventory values is detected
-				# Setting a flag to update the Preload Inventory Entry to match
-				PreloadUpdate=YES
-			else
-				SectionEnd
-	   		    /bin/echo MATCH > /var/JAMF/Name+TargetName-Match.txt
-				/bin/echo "Mac name already matches assigned name."
-				/bin/echo "Writing Marker File"
-				/bin/echo "/var/JAMF/Name+TargetName-Match.txt"
-		fi
-	else
-		#
-		/bin/echo "Could not get assigned name from computer record"
-		ScriptEnd
-		exit 1
-fi
-#
-# Check Preload Inventory Building Entry
-if [ "$PreloadBuildingEntryPresent" == "Present" ]
-	then
-		# Check if Building Entry and Preload Inventory Building Entry match
-    	if [[ "$Building" != "$PreloadBuildingEntry" ]]
-        	then
-				/bin/echo "A difference between the Building value, and the Preload Inventory Building value is detected"
-				/bin/echo "Triggering an update the Preload Inventory Entry so Values match"
-				# A change has been made, or a difference between actual and Preload Inventory values is detected
-				# Setting a flag to update the Preload Inventory Entry to match
-				PreloadUpdate=YES
-			else
-				SectionEnd
-	   		    /bin/echo MATCH > /var/JAMF/buildingName+PIbuildingName-Match.txt
-				/bin/echo "Building value, and the Preload Inventory Building value already matches assigned name."
-				/bin/echo "Writing Marker File"
-				/bin/echo "/var/JAMF/buildingName+PIbuildingName-Match.txt"
-		fi
-	else
-	    #
-		/bin/echo "PreloadBuildingEntry not present, triggering its creation/update"
-		PreloadUpdate=YES
-fi
+CheckComputerName
+CheckPreloadBuildingEntry
 #
 if [[ "$PreloadUpdate" == "YES" ]]
 	then
 		SectionEnd
 		PreLoadWrite
+		/bin/echo "Grabbing Updated Values"
+		GatherData
+		SectionEnd
+		/bin/echo "Checking Updated Values"
+        CheckComputerName
+		CheckPreloadBuildingEntry
+        SectionEnd
+        /bin/echo "Running Inventory to Update Values in JAMF Database"
+        /bin/echo # Outputting a Blank Line for Reporting Purposes
+        /usr/local/bin/jamf recon # Inventory the device
 fi
 #
 SectionEnd
+ExitCode=0
 ScriptEnd
